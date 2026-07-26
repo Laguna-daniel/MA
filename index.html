@@ -1,0 +1,1334 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Para Mariana · Carta 3D</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;900&family=Outfit:wght@300;400;600&family=Playfair+Display:ital,wght@0,600;1,400&family=Sacramento&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    
+    <style>
+        /* Reset & Variables */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        :root {
+            --bg: #05060a;
+            --envelope-bg: #131722;
+            --accent-red: #e11d48;
+            --accent-rose: #fb7185;
+            --gold: #fbbf24;
+            --text-light: #f1f5f9;
+            --text-subtle: #94a3b8;
+            --paper-bg: #181c2b;
+            --border-glow: rgba(225, 29, 72, 0.35);
+        }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text-light);
+            font-family: 'Outfit', sans-serif;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+            perspective: 1200px;
+            touch-action: manipulation;
+        }
+
+        /* Particles + Ambient */
+        #particleCanvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        .ambient-glow {
+            position: fixed;
+            width: 70vw;
+            height: 70vw;
+            max-width: 700px;
+            max-height: 700px;
+            background: radial-gradient(circle, rgba(225, 29, 72, 0.2) 0%, rgba(5, 6, 10, 0) 75%);
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 0;
+            pointer-events: none;
+            filter: blur(50px);
+        }
+
+        /* Main Viewport */
+        .viewport {
+            position: relative;
+            z-index: 10;
+            width: 100%;
+            max-width: 1000px;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 16px;
+        }
+
+        /* Top Hint */
+        .top-hint {
+            position: absolute;
+            top: 24px;
+            text-align: center;
+            transition: opacity 0.6s ease;
+            pointer-events: none;
+            width: 90%;
+        }
+
+        .pll-tag {
+            display: inline-block;
+            background: linear-gradient(135deg, #e11d48, #9f1239);
+            color: #fff;
+            padding: 6px 20px;
+            border-radius: 30px;
+            font-family: 'Cinzel', serif;
+            font-size: 12px;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            box-shadow: 0 0 18px rgba(225, 29, 72, 0.5);
+            margin-bottom: 6px;
+        }
+
+        .top-hint p {
+            color: var(--accent-rose);
+            font-family: 'Playfair Display', serif;
+            font-style: italic;
+            font-size: 15px;
+            letter-spacing: 0.3px;
+            background: rgba(5, 6, 10, 0.5);
+            padding: 4px 14px;
+            border-radius: 20px;
+            display: inline-block;
+            backdrop-filter: blur(4px);
+        }
+
+        /* 3D Envelope */
+        .scene {
+            width: 520px;
+            height: 350px;
+            position: relative;
+            perspective: 1500px;
+            cursor: pointer;
+            transition: transform 0.15s cubic-bezier(0.1, 1, 0.1, 1);
+            touch-action: none;
+        }
+
+        .envelope {
+            width: 100%;
+            height: 100%;
+            position: relative;
+            transform-style: preserve-3d;
+            transition: transform 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 30px 60px -15px rgba(0, 0, 0, 0.9), 0 0 40px rgba(225, 29, 72, 0.15);
+            border-radius: 14px;
+        }
+
+        .envelope-back {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background: var(--envelope-bg);
+            border-radius: 14px;
+            border: 1px solid var(--border-glow);
+            overflow: hidden;
+        }
+
+        /* Flap - siempre abierto cuando se muestra la carta */
+        .envelope-flap {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 0;
+            height: 0;
+            border-left: 260px solid transparent;
+            border-right: 260px solid transparent;
+            border-top: 190px solid #1a1e2d;
+            transform-origin: top center;
+            transition: transform 0.7s cubic-bezier(0.4, 0, 0.2, 1), z-index 0.2s;
+            z-index: 5;
+            filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.5));
+        }
+
+        .envelope-flap::after {
+            content: '';
+            position: absolute;
+            top: -190px;
+            left: -260px;
+            width: 0;
+            height: 0;
+            border-left: 260px solid transparent;
+            border-right: 260px solid transparent;
+            border-top: 190px solid rgba(225, 29, 72, 0.12);
+        }
+
+        /* Estado abierto del flap */
+        .scene.show-letter .envelope-flap {
+            transform: rotateX(180deg);
+            z-index: 1;
+        }
+
+        /* Pocket triangles */
+        .envelope-pocket {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 4;
+            pointer-events: none;
+        }
+
+        .pocket-bottom {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 0;
+            height: 0;
+            border-left: 260px solid transparent;
+            border-right: 260px solid transparent;
+            border-bottom: 180px solid #111420;
+            filter: drop-shadow(0 -2px 6px rgba(0, 0, 0, 0.4));
+        }
+        .pocket-left {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 0;
+            height: 0;
+            border-top: 175px solid transparent;
+            border-bottom: 175px solid transparent;
+            border-left: 270px solid #161a29;
+        }
+        .pocket-right {
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 0;
+            height: 0;
+            border-top: 175px solid transparent;
+            border-bottom: 175px solid transparent;
+            border-right: 270px solid #141826;
+        }
+
+        /* Wax Seal - desaparece al mostrar la carta */
+        .wax-seal {
+            position: absolute;
+            top: 170px;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(1);
+            width: 76px;
+            height: 76px;
+            background: radial-gradient(circle at 35% 30%, #f43f5e, #9f1239, #4c0519);
+            border-radius: 50%;
+            z-index: 10;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.8), inset 0 2px 4px rgba(255, 255, 255, 0.4), inset 0 -4px 6px rgba(0, 0, 0, 0.6);
+            cursor: pointer;
+            transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.3s ease, opacity 0.4s ease;
+            border: 2px solid rgba(225, 29, 72, 0.5);
+        }
+
+        .wax-seal:active {
+            transform: translate(-50%, -50%) scale(0.92);
+        }
+
+        .wax-seal .seal-inner {
+            width: 58px;
+            height: 58px;
+            border: 2px dashed rgba(255, 255, 255, 0.35);
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: 'Cinzel', serif;
+            font-weight: 900;
+            font-size: 26px;
+            color: #fff;
+            text-shadow: 2px 2px 6px rgba(0, 0, 0, 0.9);
+        }
+
+        .scene.show-letter .wax-seal {
+            opacity: 0;
+            transform: translate(-50%, -50%) scale(0.2) rotate(45deg);
+            pointer-events: none;
+        }
+
+        /* ===== CARTA VISIBLE DENTRO DEL SOBRE ===== */
+        .letter-preview {
+            position: absolute;
+            left: 50%;
+            bottom: 15px;
+            transform: translateX(-50%) translateY(20px);
+            width: 460px;
+            height: 300px;
+            background: linear-gradient(170deg, #1e2336 0%, #121524 100%);
+            border-radius: 10px;
+            border: 1px solid var(--border-glow);
+            z-index: 2;
+            padding: 28px 30px;
+            transition: transform 0.8s cubic-bezier(0.4, 0, 0.2, 1), height 0.8s ease, z-index 0.1s, opacity 0.6s ease;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.6);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            overflow: hidden;
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        /* Cuando se muestra la carta (estático) */
+        .scene.show-letter .letter-preview {
+            transform: translateX(-50%) translateY(-60px);
+            z-index: 6;
+            height: 350px;
+            opacity: 1;
+            pointer-events: all;
+        }
+
+        .letter-preview h3 {
+            font-family: 'Cinzel', serif;
+            color: var(--accent-rose);
+            font-size: 22px;
+            border-bottom: 1px dashed rgba(225, 29, 72, 0.25);
+            padding-bottom: 10px;
+            text-align: center;
+        }
+
+        .letter-preview .msg-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            padding: 8px 0;
+        }
+
+        .letter-preview .msg-content p {
+            font-size: 18px;
+            color: #e2e8f0;
+            line-height: 1.8;
+            text-align: center;
+            font-family: 'Playfair Display', serif;
+            font-style: italic;
+            letter-spacing: 0.3px;
+        }
+
+        .letter-preview .signature-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            border-top: 1px solid rgba(255, 255, 255, 0.06);
+            padding-top: 12px;
+        }
+
+        .letter-preview .signature {
+            font-family: 'Sacramento', cursive;
+            font-size: 26px;
+            color: var(--accent-rose);
+        }
+
+        .letter-preview .tap-hint {
+            font-size: 13px;
+            color: var(--gold);
+            border: 1px solid rgba(251, 191, 36, 0.25);
+            padding: 4px 14px;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: rgba(251, 191, 36, 0.05);
+        }
+
+        .letter-preview .tap-hint:hover {
+            background: rgba(251, 191, 36, 0.12);
+            border-color: var(--gold);
+        }
+
+        .letter-preview .tap-hint:active {
+            transform: scale(0.95);
+        }
+
+        /* ===== MODAL DE CONFIRMACIÓN (antes de mostrar la carta) ===== */
+        .confirm-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(5, 6, 10, 0.85);
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+            z-index: 80;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.4s ease;
+            padding: 20px;
+        }
+
+        .confirm-modal.active {
+            opacity: 1;
+            pointer-events: all;
+        }
+
+        .confirm-box {
+            background: #0f121d;
+            border: 1px solid rgba(225, 29, 72, 0.3);
+            border-radius: 20px;
+            padding: 36px 40px;
+            max-width: 420px;
+            width: 100%;
+            text-align: center;
+            transform: scale(0.9) translateY(20px);
+            transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+            box-shadow: 0 0 50px rgba(225, 29, 72, 0.15);
+        }
+
+        .confirm-modal.active .confirm-box {
+            transform: scale(1) translateY(0);
+        }
+
+        .confirm-box .seal-icon {
+            font-size: 48px;
+            color: var(--accent-rose);
+            margin-bottom: 12px;
+        }
+
+        .confirm-box h3 {
+            font-family: 'Cinzel', serif;
+            font-size: 22px;
+            color: #fff;
+            margin-bottom: 8px;
+        }
+
+        .confirm-box p {
+            color: #94a3b8;
+            font-size: 15px;
+            line-height: 1.6;
+            margin-bottom: 24px;
+        }
+
+        .confirm-buttons {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .confirm-btn {
+            padding: 10px 28px;
+            border-radius: 30px;
+            font-family: 'Cinzel', serif;
+            font-size: 13px;
+            font-weight: 700;
+            border: none;
+            cursor: pointer;
+            transition: all 0.25s ease;
+        }
+
+        .confirm-btn:active {
+            transform: scale(0.94);
+        }
+
+        .confirm-btn.primary {
+            background: linear-gradient(135deg, #e11d48, #9f1239);
+            color: #fff;
+            box-shadow: 0 4px 18px rgba(225, 29, 72, 0.35);
+        }
+
+        .confirm-btn.secondary {
+            background: rgba(255, 255, 255, 0.06);
+            color: #94a3b8;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        /* Full Card Modal (la carta grande desplegada) */
+        .full-card-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(5, 6, 10, 0.92);
+            backdrop-filter: blur(18px);
+            -webkit-backdrop-filter: blur(18px);
+            z-index: 100;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.5s ease;
+            padding: 16px;
+        }
+
+        .full-card-modal.active {
+            opacity: 1;
+            pointer-events: all;
+        }
+
+        .card-container {
+            width: 100%;
+            max-width: 880px;
+            max-height: 92vh;
+            background: #0f121d;
+            border: 1px solid rgba(225, 29, 72, 0.35);
+            border-radius: 20px;
+            box-shadow: 0 0 60px rgba(225, 29, 72, 0.2), 0 30px 60px rgba(0, 0, 0, 0.9);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            transform: scale(0.92) translateY(20px);
+            transition: transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        .full-card-modal.active .card-container {
+            transform: scale(1) translateY(0);
+        }
+
+        /* Card Header */
+        .card-header {
+            background: #161a29;
+            padding: 16px 24px;
+            border-bottom: 1px solid rgba(225, 29, 72, 0.15);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .card-nav {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .tab-btn {
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            color: #94a3b8;
+            padding: 6px 14px;
+            border-radius: 30px;
+            font-family: 'Cinzel', serif;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            white-space: nowrap;
+        }
+
+        .tab-btn:active {
+            transform: scale(0.95);
+        }
+
+        .tab-btn:hover {
+            color: #fff;
+            border-color: rgba(225, 29, 72, 0.4);
+        }
+
+        .tab-btn.active {
+            background: linear-gradient(135deg, #e11d48, #9f1239);
+            color: #fff;
+            border-color: var(--accent-rose);
+            box-shadow: 0 0 14px rgba(225, 29, 72, 0.35);
+        }
+
+        .close-btn {
+            background: none;
+            border: none;
+            color: #94a3b8;
+            font-size: 26px;
+            cursor: pointer;
+            transition: color 0.3s ease;
+            line-height: 1;
+        }
+
+        .close-btn:active {
+            transform: scale(0.9);
+        }
+
+        .close-btn:hover {
+            color: var(--accent-rose);
+        }
+
+        /* Card Body */
+        .card-body {
+            padding: 28px 30px;
+            overflow-y: auto;
+            flex-grow: 1;
+            scroll-behavior: smooth;
+        }
+
+        .tab-content {
+            display: none;
+            animation: fadeUp 0.4s ease forwards;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        @keyframes fadeUp {
+            from { opacity: 0; transform: translateY(12px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .secret-heading {
+            font-family: 'Cinzel', serif;
+            font-size: 28px;
+            color: #fff;
+            margin-bottom: 4px;
+            text-shadow: 0 0 12px rgba(225, 29, 72, 0.2);
+        }
+
+        .secret-sub {
+            font-family: 'Playfair Display', serif;
+            font-style: italic;
+            color: var(--accent-rose);
+            font-size: 17px;
+            margin-bottom: 20px;
+        }
+
+        .letter-text p {
+            font-size: 16px;
+            line-height: 1.8;
+            color: #cbd5e1;
+            margin-bottom: 16px;
+        }
+
+        .quote-box {
+            background: rgba(225, 29, 72, 0.07);
+            border-left: 4px solid var(--accent-red);
+            padding: 14px 20px;
+            border-radius: 0 10px 10px 0;
+            margin: 18px 0;
+            font-family: 'Playfair Display', serif;
+            font-style: italic;
+            font-size: 18px;
+            color: #fda4af;
+        }
+
+        /* Favorites Grid */
+        .fav-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 16px;
+            margin-top: 16px;
+        }
+
+        .fav-card {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(225, 29, 72, 0.15);
+            border-radius: 14px;
+            padding: 18px 14px;
+            text-align: center;
+            transition: transform 0.25s ease, border-color 0.25s ease;
+        }
+
+        .fav-card:active {
+            transform: scale(0.96);
+        }
+
+        .fav-card i {
+            font-size: 32px;
+            color: var(--accent-rose);
+            margin-bottom: 10px;
+        }
+
+        .fav-card h4 {
+            font-family: 'Cinzel', serif;
+            font-size: 16px;
+            color: #fff;
+            margin-bottom: 4px;
+        }
+
+        .fav-card p {
+            font-size: 13px;
+            color: #94a3b8;
+            line-height: 1.4;
+        }
+
+        /* Destinations */
+        .dest-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 16px;
+            margin-top: 16px;
+        }
+
+        .dest-card {
+            background: #161a29;
+            border-radius: 14px;
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
+            transition: transform 0.25s ease, border-color 0.25s ease;
+        }
+
+        .dest-card:active {
+            transform: scale(0.96);
+        }
+
+        .dest-img {
+            height: 130px;
+            width: 100%;
+            background-size: cover;
+            background-position: center;
+        }
+
+        .dest-info {
+            padding: 14px;
+            text-align: center;
+        }
+
+        .dest-info h4 {
+            font-family: 'Cinzel', serif;
+            color: #fff;
+            font-size: 15px;
+            margin-bottom: 2px;
+        }
+
+        .dest-info p {
+            font-size: 12px;
+            color: #94a3b8;
+        }
+
+        /* CTA */
+        .cta-section {
+            text-align: center;
+            padding: 24px 16px;
+            background: radial-gradient(circle, rgba(225, 29, 72, 0.1) 0%, rgba(15, 18, 29, 0) 80%);
+            border-radius: 18px;
+            margin-top: 10px;
+            border: 1px solid rgba(225, 29, 72, 0.15);
+        }
+
+        .guarantee-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(225, 29, 72, 0.15);
+            border: 1px solid var(--accent-red);
+            padding: 6px 18px;
+            border-radius: 30px;
+            color: var(--accent-rose);
+            font-family: 'Cinzel', serif;
+            font-weight: 700;
+            font-size: 13px;
+            margin-bottom: 16px;
+        }
+
+        .response-buttons {
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-top: 16px;
+        }
+
+        .action-btn {
+            background: linear-gradient(135deg, #e11d48, #9f1239);
+            color: #fff;
+            padding: 12px 26px;
+            border-radius: 40px;
+            font-family: 'Cinzel', serif;
+            font-size: 13px;
+            font-weight: 700;
+            border: none;
+            cursor: pointer;
+            box-shadow: 0 4px 18px rgba(225, 29, 72, 0.35);
+            transition: all 0.25s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            text-decoration: none;
+        }
+
+        .action-btn:active {
+            transform: scale(0.94);
+        }
+
+        .action-btn.secondary {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            box-shadow: none;
+        }
+
+        .action-btn.secondary:active {
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        /* Audio Control */
+        .audio-control {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 44px;
+            height: 44px;
+            background: rgba(225, 29, 72, 0.15);
+            border: 1px solid rgba(225, 29, 72, 0.3);
+            border-radius: 50%;
+            color: #fff;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            z-index: 120;
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            transition: all 0.25s ease;
+        }
+
+        .audio-control:active {
+            transform: scale(0.88);
+        }
+
+        /* ===== RESPONSIVE ===== */
+        @media (max-width: 480px) {
+            .viewport { padding: 12px; }
+            .scene {
+                width: 88vw;
+                max-width: 360px;
+                height: auto;
+                aspect-ratio: 520 / 350;
+            }
+            .envelope-flap {
+                border-left-width: 50%;
+                border-right-width: 50%;
+                border-top-width: 54%;
+            }
+            .envelope-flap::after {
+                top: -54%;
+                left: -50%;
+                border-left-width: 50%;
+                border-right-width: 50%;
+                border-top-width: 54%;
+            }
+            .pocket-bottom {
+                border-left-width: 50%;
+                border-right-width: 50%;
+                border-bottom-width: 52%;
+            }
+            .pocket-left {
+                border-top-width: 50%;
+                border-bottom-width: 50%;
+                border-left-width: 52%;
+            }
+            .pocket-right {
+                border-top-width: 50%;
+                border-bottom-width: 50%;
+                border-right-width: 52%;
+            }
+            .wax-seal {
+                top: 48%;
+                width: 18vw;
+                height: 18vw;
+                max-width: 68px;
+                max-height: 68px;
+            }
+            .wax-seal .seal-inner {
+                width: 74%;
+                height: 74%;
+                font-size: 4.8vw;
+            }
+            .letter-preview {
+                width: 88%;
+                height: 78%;
+                bottom: 6%;
+                padding: 18px 16px;
+            }
+            .letter-preview h3 { font-size: 17px; }
+            .letter-preview .msg-content p { font-size: 15px; }
+            .letter-preview .signature { font-size: 22px; }
+            .letter-preview .tap-hint { font-size: 11px; padding: 3px 10px; }
+            .scene.show-letter .letter-preview {
+                transform: translateX(-50%) translateY(-50%);
+                height: 82%;
+            }
+            .top-hint { top: 12px; }
+            .pll-tag { font-size: 10px; padding: 4px 14px; }
+            .top-hint p { font-size: 12px; padding: 2px 10px; }
+
+            .confirm-box { padding: 28px 20px; }
+            .confirm-box h3 { font-size: 19px; }
+            .confirm-box p { font-size: 14px; }
+
+            .card-container { max-height: 94vh; border-radius: 16px; }
+            .card-header { padding: 12px 16px; }
+            .tab-btn { font-size: 10px; padding: 4px 10px; }
+            .card-body { padding: 18px 16px; }
+            .secret-heading { font-size: 22px; }
+            .secret-sub { font-size: 14px; }
+            .letter-text p { font-size: 14px; }
+            .quote-box { font-size: 15px; padding: 12px 16px; }
+            .fav-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
+            .fav-card { padding: 14px 10px; }
+            .fav-card i { font-size: 26px; }
+            .fav-card h4 { font-size: 14px; }
+            .dest-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
+            .dest-img { height: 100px; }
+            .dest-info h4 { font-size: 13px; }
+            .action-btn { padding: 10px 18px; font-size: 12px; }
+            .cta-section { padding: 18px 12px; }
+            .guarantee-badge { font-size: 11px; padding: 4px 12px; }
+            .audio-control { width: 38px; height: 38px; bottom: 14px; right: 14px; font-size: 14px; }
+        }
+
+        @media (max-width: 380px) {
+            .fav-grid { grid-template-columns: 1fr; }
+            .dest-grid { grid-template-columns: 1fr; }
+            .card-nav { gap: 4px; }
+            .tab-btn { font-size: 9px; padding: 3px 8px; }
+            .secret-heading { font-size: 20px; }
+            .letter-preview .msg-content p { font-size: 13px; }
+        }
+
+        @media (width: 375px) and (height: 812px) {
+            .scene { max-width: 340px; }
+            .wax-seal { width: 66px; height: 66px; }
+            .wax-seal .seal-inner { width: 50px; height: 50px; font-size: 22px; }
+        }
+
+        @media (max-width: 340px) {
+            .scene { max-width: 290px; }
+            .letter-preview { padding: 14px 12px; }
+            .letter-preview h3 { font-size: 15px; }
+            .letter-preview .msg-content p { font-size: 12px; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Canvas de partículas -->
+    <canvas id="particleCanvas"></canvas>
+    <div class="ambient-glow"></div>
+
+    <!-- Control de audio -->
+    <button class="audio-control" id="audioToggle" aria-label="Activar sonido">
+        <i class="fa-solid fa-volume-xmark" id="audioIcon"></i>
+    </button>
+
+    <!-- Vista principal -->
+    <div class="viewport">
+        <div class="top-hint" id="topHint">
+            <span class="pll-tag">Got a secret, can you keep it?</span>
+            <p>Toque el sello para Mariana ✦</p>
+        </div>
+
+        <div class="scene" id="envelopeScene">
+            <div class="envelope" id="envelope">
+                <div class="envelope-back"></div>
+
+                <!-- CARTA DENTRO DEL SOBRE (se muestra estática al tocar el sello) -->
+                <div class="letter-preview" id="letterPreview">
+                    <h3>✧ Un Mensaje Especial ✧</h3>
+                    <div class="msg-content">
+                        <p>
+                            "A veces no se requieren meses<br>
+                            para saber que vale la pena<br>
+                            conocer a fondo a una persona."
+                        </p>
+                    </div>
+                    <div class="signature-row">
+                        <span class="signature">- Con aprecio, -Me</span>
+                        <span class="tap-hint" id="tapToExpand">📖 Toca para desplegar</span>
+                    </div>
+                </div>
+
+                <div class="envelope-flap" id="envelopeFlap"></div>
+
+                <div class="envelope-pocket">
+                    <div class="pocket-left"></div>
+                    <div class="pocket-right"></div>
+                    <div class="pocket-bottom"></div>
+                </div>
+
+                <div class="wax-seal" id="waxSeal" aria-label="Romper el sello">
+                    <div class="seal-inner">-A</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== MODAL DE CONFIRMACIÓN ===== -->
+    <div class="confirm-modal" id="confirmModal">
+        <div class="confirm-box">
+            <div class="seal-icon"><i class="fa-solid fa-envelope-open"></i></div>
+            <h3>¿Mostrar la carta?</h3>
+            <p>Un mensaje especial espera por ti, Mariana.</p>
+            <div class="confirm-buttons">
+                <button class="confirm-btn primary" id="confirmOpenBtn">✨ Mostrar carta</button>
+                <button class="confirm-btn secondary" id="confirmCancelBtn">Ahora no</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal completo (la carta grande desplegada) -->
+    <div class="full-card-modal" id="cardModal">
+        <div class="card-container">
+            <div class="card-header">
+                <div class="card-nav">
+                    <button class="tab-btn active" data-tab="tab-letter">El Mensaje</button>
+                    <button class="tab-btn" data-tab="tab-favs">Favoritos</button>
+                    <button class="tab-btn" data-tab="tab-destinations">Destinos</button>
+                    <button class="tab-btn" data-tab="tab-promise">La Promesa</button>
+                </div>
+                <button class="close-btn" id="closeModalBtn">&times;</button>
+            </div>
+
+            <div class="card-body">
+                <!-- Tab 1 -->
+                <div class="tab-content active" id="tab-letter">
+                    <h2 class="secret-heading">Capítulo I: El Enigma</h2>
+                    <p class="secret-sub">Creado especialmente para Mariana.</p>
+                    <div class="letter-text">
+                        <p>
+                            Dicen que los mejores enigmas son aquellos que despiertan curiosidad desde el primer segundo. Sé que te atrapa el misterio de <em>Pretty Little Liars</em>, que aprecias los detalles sutiles como un buen reloj o manilla, y el encanto de una charla sincera.
+                        </p>
+                        <div class="quote-box">
+                            "Got a secret, can you keep it? Swear this one you'll save..."
+                        </div>
+                        <p>
+                            Esta carta no la manda <strong>'-A'</strong>, la mandé yo para decirte, con toda la seguridad, que aunque apenas estamos coincidiendo, me encantaría seguir conociéndote más. Eres increíble, Mariana.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Tab 2 -->
+                <div class="tab-content" id="tab-favs">
+                    <h2 class="secret-heading">Tus Favoritos</h2>
+                    <p class="secret-sub">Los pequeños detalles que alegran cualquier momento.</p>
+                    <div class="fav-grid">
+                        <div class="fav-card">
+                            <i class="fa-solid fa-cookie-bite"></i>
+                            <h4>Brownie de Chocorramo</h4>
+                            <p>El dulce perfecto para acompañar cualquier buena conversación.</p>
+                        </div>
+                        <div class="fav-card">
+                            <i class="fa-solid fa-pepper-hot"></i>
+                            <h4>De Todito Flamin' Hot</h4>
+                            <p>O unas buenas papas de tomate con el toque picante idóneo.</p>
+                        </div>
+                        <div class="fav-card">
+                            <i class="fa-solid fa-wine-bottle"></i>
+                            <h4>Pony Malta Helada</h4>
+                            <p>O una Coca-Cola / Fanta Naranja bien fría para ponernos al día.</p>
+                        </div>
+                        <div class="fav-card">
+                            <i class="fa-solid fa-gem"></i>
+                            <h4>Chocolatina Blanca</h4>
+                            <p>Y la infaltable cremosa chocolatina blanca con galletas Festival.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tab 3 -->
+                <div class="tab-content" id="tab-destinations">
+                    <h2 class="secret-heading">Próximos Horizontes</h2>
+                    <p class="secret-sub">Lugares soñados por descubrir.</p>
+                    <div class="dest-grid">
+                        <div class="dest-card">
+                            <div class="dest-img" style="background-image: url('https://images.unsplash.com/photo-1502602898657-3e91760cbb34?auto=format&fit=crop&w=600&q=80');"></div>
+                            <div class="dest-info">
+                                <h4>Francia</h4>
+                                <p>Cafés bohemios y luces nocturnas.</p>
+                            </div>
+                        </div>
+                        <div class="dest-card">
+                            <div class="dest-img" style="background-image: url('https://images.unsplash.com/photo-1530122037265-a5f1f91d3b99?auto=format&fit=crop&w=600&q=80');"></div>
+                            <div class="dest-info">
+                                <h4>Suiza</h4>
+                                <p>Lagos de cristal y Alpes infinitos.</p>
+                            </div>
+                        </div>
+                        <div class="dest-card">
+                            <div class="dest-img" style="background-image: url('https://images.unsplash.com/photo-1503614472-8c93d56e92ce?auto=format&fit=crop&w=600&q=80');"></div>
+                            <div class="dest-info">
+                                <h4>Canadá</h4>
+                                <p>Naturaleza serena y tranquilidad.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tab 4 -->
+                <div class="tab-content" id="tab-promise">
+                    <div class="cta-section">
+                        <div class="guarantee-badge">
+                            <i class="fa-solid fa-shield-halved"></i> Garantía 100% Sin Arrepentimientos
+                        </div>
+                        <h2 class="secret-heading">¿Aceptas la invitación?</h2>
+                        <p style="color: #cbd5e1; max-width: 600px; margin: 12px auto; line-height: 1.7; font-size: 15px;">
+                            Sé que nos conocemos hace poco, pero si nos damos la oportunidad de compartir más risas, un buen café o un De Todito... te prometo que no te vas a arrepentir ni un solo segundo, Mariana.
+                        </p>
+                        <div class="response-buttons">
+                            <a href="https://api.whatsapp.com/send?text=%C2%A1Acepto%20la%20invitaci%C3%B3n!%20%F0%9F%A4%AB%20%C2%BFCu%C3%A1ndo%20nos%20vemos%3F" target="_blank" class="action-btn">
+                                <i class="fa-brands fa-whatsapp"></i> Responder
+                            </a>
+                            <button class="action-btn secondary" id="guardarSecretoBtn">Guardar el Secreto</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ===== PARTÍCULAS =====
+        const canvas = document.getElementById('particleCanvas');
+        const ctx = canvas.getContext('2d');
+        let particles = [];
+
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        class Particle {
+            constructor() { this.reset(); }
+            reset() {
+                this.x = Math.random() * canvas.width;
+                this.y = Math.random() * canvas.height;
+                this.size = Math.random() * 2.2 + 0.8;
+                this.speedX = (Math.random() - 0.5) * 0.4;
+                this.speedY = -Math.random() * 0.4 - 0.15;
+                this.alpha = Math.random() * 0.5 + 0.15;
+                this.color = Math.random() > 0.5 ? '#e11d48' : '#fb7185';
+            }
+            update() {
+                this.x += this.speedX;
+                this.y += this.speedY;
+                if (this.y < 0 || this.x < 0 || this.x > canvas.width) {
+                    this.reset();
+                    this.y = canvas.height + 10;
+                }
+            }
+            draw() {
+                ctx.save();
+                ctx.globalAlpha = this.alpha;
+                ctx.shadowBlur = 12;
+                ctx.shadowColor = this.color;
+                ctx.fillStyle = this.color;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            }
+        }
+
+        for (let i = 0; i < 55; i++) particles.push(new Particle());
+
+        function animateParticles() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            particles.forEach(p => { p.update(); p.draw(); });
+            requestAnimationFrame(animateParticles);
+        }
+        animateParticles();
+
+        // ===== INTERACCIÓN 3D (solo escritorio) =====
+        const scene = document.getElementById('envelopeScene');
+        let isLetterVisible = false;
+
+        let tiltActive = true;
+        if ('ontouchstart' in window) tiltActive = false;
+
+        document.addEventListener('mousemove', (e) => {
+            if (!tiltActive || isLetterVisible) return;
+            const xAxis = (window.innerWidth / 2 - e.pageX) / 30;
+            const yAxis = (window.innerHeight / 2 - e.pageY) / 30;
+            scene.style.transform = `rotateY(${-xAxis}deg) rotateX(${yAxis}deg)`;
+        });
+
+        // ===== AUDIO =====
+        let audioCtx = null;
+        let isAudioPlaying = false;
+        let oscillator = null;
+        let gainNode = null;
+
+        function initAudio() {
+            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+
+        function playEnvelopeSound() {
+            initAudio();
+            if (!audioCtx) return;
+            const bufferSize = audioCtx.sampleRate * 0.12;
+            const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+            const data = buffer.getChannelData(0);
+            for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+            const noise = audioCtx.createBufferSource();
+            noise.buffer = buffer;
+            const filter = audioCtx.createBiquadFilter();
+            filter.type = 'bandpass';
+            filter.frequency.value = 1400;
+            const noiseGain = audioCtx.createGain();
+            noiseGain.gain.setValueAtTime(0.25, audioCtx.currentTime);
+            noiseGain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.12);
+            noise.connect(filter);
+            filter.connect(noiseGain);
+            noiseGain.connect(audioCtx.destination);
+            noise.start();
+        }
+
+        function toggleAmbientAudio() {
+            initAudio();
+            const icon = document.getElementById('audioIcon');
+            if (!isAudioPlaying) {
+                if (audioCtx.state === 'suspended') audioCtx.resume();
+                oscillator = audioCtx.createOscillator();
+                gainNode = audioCtx.createGain();
+                oscillator.type = 'sine';
+                oscillator.frequency.setValueAtTime(110, audioCtx.currentTime);
+                gainNode.gain.setValueAtTime(0.01, audioCtx.currentTime);
+                gainNode.gain.linearRampToValueAtTime(0.06, audioCtx.currentTime + 2);
+                oscillator.connect(gainNode);
+                gainNode.connect(audioCtx.destination);
+                oscillator.start();
+                icon.className = 'fa-solid fa-volume-high';
+                isAudioPlaying = true;
+            } else {
+                if (gainNode) {
+                    gainNode.gain.linearRampToValueAtTime(0.001, audioCtx.currentTime + 0.4);
+                    setTimeout(() => { if (oscillator) oscillator.stop(); }, 500);
+                }
+                icon.className = 'fa-solid fa-volume-xmark';
+                isAudioPlaying = false;
+            }
+        }
+
+        document.getElementById('audioToggle').addEventListener('click', toggleAmbientAudio);
+
+        // ===== MOSTRAR CARTA (estática dentro del sobre) =====
+        const confirmModal = document.getElementById('confirmModal');
+        const confirmOpenBtn = document.getElementById('confirmOpenBtn');
+        const confirmCancelBtn = document.getElementById('confirmCancelBtn');
+        const waxSeal = document.getElementById('waxSeal');
+        const letterPreview = document.getElementById('letterPreview');
+        const tapToExpand = document.getElementById('tapToExpand');
+        const cardModal = document.getElementById('cardModal');
+        const topHint = document.getElementById('topHint');
+
+        function showLetterStatic() {
+            if (isLetterVisible) {
+                openCardModal();
+                return;
+            }
+            isLetterVisible = true;
+            playEnvelopeSound();
+            scene.classList.add('show-letter');
+            topHint.style.opacity = '0';
+            scene.style.transform = 'rotateY(0deg) rotateX(0deg)';
+            confirmModal.classList.remove('active');
+        }
+
+        // Mostrar modal de confirmación al hacer clic en el sello
+        function showConfirmModal() {
+            if (isLetterVisible) {
+                openCardModal();
+                return;
+            }
+            confirmModal.classList.add('active');
+        }
+
+        // Confirmar mostrar carta
+        confirmOpenBtn.addEventListener('click', showLetterStatic);
+        confirmOpenBtn.addEventListener('touchstart', (e) => { e.preventDefault(); showLetterStatic(); });
+
+        // Cancelar
+        function cancelOpen() {
+            confirmModal.classList.remove('active');
+        }
+        confirmCancelBtn.addEventListener('click', cancelOpen);
+        confirmCancelBtn.addEventListener('touchstart', (e) => { e.preventDefault(); cancelOpen(); });
+
+        // Cerrar modal de confirmación al hacer clic fuera
+        confirmModal.addEventListener('click', (e) => {
+            if (e.target === confirmModal) cancelOpen();
+        });
+
+        // Al hacer clic en el sello
+        waxSeal.addEventListener('click', showConfirmModal);
+        waxSeal.addEventListener('touchstart', (e) => { e.preventDefault(); showConfirmModal(); });
+
+        // ===== ABRIR MODAL COMPLETO (al hacer clic en "Toca para desplegar") =====
+        function openCardModal() {
+            cardModal.classList.add('active');
+            document.body.style.overflow = 'hidden';
+        }
+
+        tapToExpand.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (isLetterVisible) {
+                openCardModal();
+            }
+        });
+        tapToExpand.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (isLetterVisible) {
+                openCardModal();
+            }
+        });
+
+        // También al hacer clic en la carta (si está visible)
+        letterPreview.addEventListener('click', () => {
+            if (isLetterVisible) openCardModal();
+        });
+
+        // ===== CERRAR MODAL =====
+        function closeCardModal() {
+            cardModal.classList.remove('active');
+            document.body.style.overflow = '';
+        }
+
+        document.getElementById('closeModalBtn').addEventListener('click', closeCardModal);
+        document.getElementById('guardarSecretoBtn').addEventListener('click', closeCardModal);
+
+        cardModal.addEventListener('click', (e) => {
+            if (e.target === cardModal) closeCardModal();
+        });
+
+        // Tabs
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                this.classList.add('active');
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                document.getElementById(this.dataset.tab).classList.add('active');
+            });
+        });
+
+        // Cierre con ESC
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                if (confirmModal.classList.contains('active')) cancelOpen();
+                else closeCardModal();
+            }
+        });
+    </script>
+</body>
+</html>
